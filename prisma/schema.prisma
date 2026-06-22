@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+}
+
+model User {
+  id                     String                  @id @default(cuid())
+  email                  String                  @unique
+  phone                  String?                 @unique
+  password               String
+  name                   String?
+  role                   String                  @default("USER")
+  tenantId               String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  aiConversations        AIConversation[]
+  openingDecisionRecords OpeningDecisionRecord[]
+  sessions               Session[]
+  tenant                 Tenant?                 @relation(fields: [tenantId], references: [id])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  fileName    String?
+  fileType    String?
+  content     String?
+  fileData    String?
+  status      String   @default("pending")
+  directoryId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OpeningDecisionSetting {
+  id        String   @id @default(cuid())
+  module    String?
+  prompt    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OpeningDecisionRecord {
+  id                String   @id @default(cuid())
+  userId            String
+  module            String?
+  userPrompt        String?
+  assistantResponse String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AIConversation {
+  id        String   @id @default(cuid())
+  userId    String?
+  userName  String?
+  module    String
+  model     String
+  prompt    String
+  response  String?
+  tokens    Int?
+  duration  Int?
+  error     String?
+  metadata  String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([userName])
+  @@index([module])
+  @@index([createdAt])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
