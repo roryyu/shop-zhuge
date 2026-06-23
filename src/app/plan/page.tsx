@@ -65,6 +65,7 @@ interface Message {
   content: string
   module?: string
   createdAt: Date
+  isStreaming?: boolean
 }
 
 export default function PlanPage() {
@@ -78,6 +79,7 @@ export default function PlanPage() {
   const [submitting, setSubmitting] = useState(false)
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState("")
+  const [localMessages, setLocalMessages] = useState<Message[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // 滚动到底部
@@ -161,19 +163,72 @@ export default function PlanPage() {
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     : []
 
+  // 合并历史记录和本地临时消息（流式显示用）
+  const displayMessages: Message[] = selectedModule
+    ? [
+        ...currentModuleRecords.map((r) => ({
+          id: r.id,
+          role: "user" as const,
+          content: r.userPrompt || "",
+          module: r.module || undefined,
+          createdAt: new Date(r.createdAt),
+          isStreaming: false,
+        })),
+        ...currentModuleRecords.map((r) => ({
+          id: r.id + "-assistant",
+          role: "assistant" as const,
+          content: r.assistantResponse || "",
+          module: r.module || undefined,
+          createdAt: new Date(r.createdAt),
+          isStreaming: false,
+        })),
+        ...localMessages.filter((m) => m.module === selectedModule),
+      ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    : []
+
   // 发送消息
   const handleSend = async () => {
     if (!selectedModule || !inputValue.trim() || submitting) return
 
+    const userMessage = inputValue.trim()
+    setInputValue("")
     setSubmitting(true)
 
+    // 生成临时 ID
+    const tempId = Date.now().toString()
+
+    // 1. 先将用户消息添加到本地显示
+    const userTempMessage: Message = {
+      id: tempId,
+      role: "user",
+      content: userMessage,
+      module: selectedModule,
+      createdAt: new Date(),
+      isStreaming: false,
+    }
+    setLocalMessages((prev) => [...prev, userTempMessage])
+    setTimeout(scrollToBottom, 100)
+
+    // 2. 添加 AI 正在回复的占位消息
+    const assistantTempMessage: Message = {
+      id: tempId + "-assistant",
+      role: "assistant",
+      content: "",
+      module: selectedModule,
+      createdAt: new Date(),
+      isStreaming: true,
+    }
+    setLocalMessages((prev) => [...prev, assistantTempMessage])
+    setTimeout(scrollToBottom, 100)
+
     try {
-      const res = await fetch("/api/plan", {
+      // 3. 调用流式 API
+      const res = await fetch("/api/plan/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           module: selectedModule,
-          userPrompt: inputValue,
+          userPrompt: userMessage,
         }),
       })
 
@@ -182,14 +237,62 @@ export default function PlanPage() {
         throw new Error(err.error || "发送失败")
       }
 
-      const newRecord = await res.json()
-      setRecords((prev) => [newRecord, ...prev])
-      setInputValue("")
+      // 4. 读取流式响应
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      let fullResponse = ""
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split("\n")
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6)
+              if (data === "[DONE]") continue
+
+              try {
+                const parsed = JSON.parse(data)
+                if (parsed.content) {
+                  fullResponse += parsed.content
+                  // 更新本地 AI 消息内容
+                  setLocalMessages((prev) =>
+                    prev.map((m) =>
+                      m.id === tempId + "-assistant"
+                        ? { ...m, content: fullResponse }
+                        : m
+                    )
+                  )
+                  setTimeout(scrollToBottom, 50)
+                } else if (parsed.recordId) {
+                  // 收到最终记录 ID，刷新历史记录
+                  const newRecordId = parsed.recordId
+                  // 从本地移除临时消息
+                  setLocalMessages((prev) =>
+                    prev.filter((m) => m.id !== tempId && m.id !== tempId + "-assistant")
+                  )
+                  // 刷新历史记录
+                  fetchData()
+                }
+              } catch (e) {
+                // 忽略解析错误
+              }
+            }
+          }
+        }
+      }
     } catch (error: any) {
       alert(error.message || "发送失败，请稍后重试")
+      // 出错时移除临时消息
+      setLocalMessages((prev) =>
+        prev.filter((m) => m.id !== tempId && m.id !== tempId + "-assistant")
+      )
     } finally {
       setSubmitting(false)
-      setTimeout(scrollToBottom, 100)
     }
   }
 
@@ -343,41 +446,56 @@ export default function PlanPage() {
       <div className="flex-1 flex flex-col">
         {/* 消息展示区域 */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {selectedModule && currentModuleRecords.length > 0 ? (
+          {selectedModule && displayMessages.length > 0 ? (
             // 显示该模块下的所有聊天记录
             <div className="max-w-4xl mx-auto space-y-6">
-              {currentModuleRecords.map((record) => (
-                <div key={record.id} className="space-y-6">
-                  {/* 用户消息 */}
-                  <div className="flex gap-4 justify-end">
-                    <div className="max-w-[70%] bg-[#ff385c] text-white px-5 py-3 rounded-2xl rounded-br-md shadow-sm">
-                      <p className="text-sm whitespace-pre-wrap">{record.userPrompt}</p>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      <User className="h-4 w-4 text-gray-500" />
-                    </div>
-                  </div>
-
-                  {/* AI 回复 */}
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-full bg-[#ebebeb] flex items-center justify-center flex-shrink-0">
-                      <Bot className="h-4 w-4 text-[#ff385c]" />
-                    </div>
-                    <div className="max-w-[70%] bg-white border border-[#ebebeb] px-5 py-4 rounded-2xl rounded-tl-md shadow-sm">
-                      <div className="prose prose-sm max-w-none prose-table:border-collapse prose-table:w-full prose-th:border prose-th:px-3 prose-th:py-2 prose-th:bg-gray-50 prose-th:text-left prose-td:border prose-td:px-3 prose-td:py-2 markdown-content">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeRaw]}
-                        >
-                          {record.assistantResponse || ""}
-                        </ReactMarkdown>
+              {displayMessages.map((message) => (
+                <div key={message.id} className="space-y-6">
+                  {message.role === "user" ? (
+                    /* 用户消息 */
+                    <div className="flex gap-4 justify-end">
+                      <div className="max-w-[70%] bg-[#ff385c] text-white px-5 py-3 rounded-2xl rounded-br-md shadow-sm">
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                       </div>
-                      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-400">
-                        <Calendar className="h-3 w-3" />
-                        <span>{new Date(record.createdAt).toLocaleString("zh-CN")}</span>
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <User className="h-4 w-4 text-gray-500" />
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* AI 回复 */
+                    <div className="flex gap-4">
+                      <div className="w-8 h-8 rounded-full bg-[#ebebeb] flex items-center justify-center flex-shrink-0">
+                        <Bot className="h-4 w-4 text-[#ff385c]" />
+                      </div>
+                      <div className="max-w-[70%] bg-white border border-[#ebebeb] px-5 py-4 rounded-2xl rounded-tl-md shadow-sm">
+                        <div className="prose prose-sm max-w-none prose-table:border-collapse prose-table:w-full prose-th:border prose-th:px-3 prose-th:py-2 prose-th:bg-gray-50 prose-th:text-left prose-td:border prose-td:px-3 prose-td:py-2 markdown-content">
+                          {message.content ? (
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              rehypePlugins={[rehypeRaw]}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                          ) : message.isStreaming ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-gray-400">正在思考</span>
+                              <span className="flex gap-0.5">
+                                <span className="w-1.5 h-1.5 bg-[#ff385c] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                                <span className="w-1.5 h-1.5 bg-[#ff385c] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                                <span className="w-1.5 h-1.5 bg-[#ff385c] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                        {!message.isStreaming && (
+                          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-400">
+                            <Calendar className="h-3 w-3" />
+                            <span>{message.createdAt.toLocaleString("zh-CN")}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               <div ref={messagesEndRef} />
