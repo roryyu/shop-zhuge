@@ -19,14 +19,14 @@ export function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-6">
-          <Link href="/shops" className="text-[#222222] hover:text-[#ff385c] transition-colors">
-            门店管理
+          <Link href="/plan" className="text-[#222222] hover:text-[#ff385c] transition-colors">
+            门店计划
           </Link>
-          <Link href="/analytics" className="text-[#222222] hover:text-[#ff385c] transition-colors">
+          <Link href="/review" className="text-[#222222] hover:text-[#ff385c] transition-colors">
             数据分析
           </Link>
-          <Link href="/ai-assistant" className="text-[#222222] hover:text-[#ff385c] transition-colors">
-            AI 助手
+          <Link href="/agency" className="text-[#222222] hover:text-[#ff385c] transition-colors">
+            AI 运营
           </Link>
         </div>
 
@@ -56,6 +56,15 @@ export function Navbar() {
                       onClick={() => setShowUserMenu(false)}
                     >
                       管理后台
+                    </Link>
+                  )}
+                  {(session.user as any)?.role === "TENANTADMIN" && (
+                    <Link
+                      href="/tenant/users"
+                      className="block px-4 py-2 text-sm text-[#222222] hover:bg-[#f7f7f7]"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      租户管理
                     </Link>
                   )}
                   <Link
@@ -93,7 +102,7 @@ export function Navbar() {
                   登录
                 </Button>
               </Link>
-              <Link href="/register">
+              <Link href="/register" style={{display: "none"}}>
                 <Button size="sm">
                   注册
                 </Button>

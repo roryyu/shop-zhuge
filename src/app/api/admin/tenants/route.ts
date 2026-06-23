@@ -22,6 +22,7 @@ export async function GET() {
             role: true,
           },
         },
+        modulePermissions: true,
       },
       orderBy: { createdAt: "desc" },
     })
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "无权访问" }, { status: 403 })
     }
 
-    const { name, adminEmail, adminPassword, adminName } = await request.json()
+    const { name, adminEmail, adminPassword, adminName, modulePermissions } = await request.json()
 
     if (!name || !adminEmail || !adminPassword) {
       return NextResponse.json(
@@ -63,29 +64,42 @@ export async function POST(request: Request) {
       )
     }
 
-    // 使用事务创建租户和管理员用户
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. 创建租户
-      const tenant = await tx.tenant.create({
-        data: { name },
-      })
-
-      // 2. 加密密码
-      const hashedPassword = await bcrypt.hash(adminPassword, 10)
-
-      // 3. 创建租户管理员
-      const adminUser = await tx.user.create({
-        data: {
-          email: adminEmail,
-          password: hashedPassword,
-          name: adminName || "租户管理员",
-          role: "TENANTADMIN",
-          tenantId: tenant.id,
-        },
-      })
-
-      return { tenant, adminUser }
+    // 1. 创建租户
+    const tenant = await prisma.tenant.create({
+      data: { name },
     })
+
+    // 2. 加密密码
+    const hashedPassword = await bcrypt.hash(adminPassword, 10)
+
+    // 3. 创建租户管理员
+    const adminUser = await prisma.user.create({
+      data: {
+        email: adminEmail,
+        password: hashedPassword,
+        name: adminName || "租户管理员",
+        role: "TENANTADMIN",
+        tenantId: tenant.id,
+      },
+    })
+
+    // 4. 创建租户模块权限
+    const permissions = await prisma.tenantModulePermission.create({
+      data: {
+        tenantId: tenant.id,
+        storeOpeningConsultation: modulePermissions?.storeOpeningConsultation ?? true,
+        categorySelectionAdvice: modulePermissions?.categorySelectionAdvice ?? true,
+        locationScreening: modulePermissions?.locationScreening ?? true,
+        brandPositioningAdvice: modulePermissions?.brandPositioningAdvice ?? true,
+        licenseAndLaunchChecklist: modulePermissions?.licenseAndLaunchChecklist ?? true,
+        storeOpeningProcessSOP: modulePermissions?.storeOpeningProcessSOP ?? true,
+        priceSuggestion: modulePermissions?.priceSuggestion ?? true,
+        groupPurchasePackageDesign: modulePermissions?.groupPurchasePackageDesign ?? true,
+        marketingAdvice: modulePermissions?.marketingAdvice ?? true,
+      },
+    })
+
+    const result = { tenant, adminUser, modulePermissions: permissions }
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {

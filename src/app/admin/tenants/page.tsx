@@ -5,6 +5,31 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Plus, Pencil, Trash2, X, Check, Building2, Users, Loader2 } from "lucide-react"
 
+// 模块配置列表
+const MODULE_LIST = [
+  { key: "storeOpeningConsultation", label: "开店咨询" },
+  { key: "categorySelectionAdvice", label: "品类选择建议" },
+  { key: "locationScreening", label: "商圈筛选" },
+  { key: "brandPositioningAdvice", label: "品牌定位建议" },
+  { key: "licenseAndLaunchChecklist", label: "证照/上线办理清单" },
+  { key: "storeOpeningProcessSOP", label: "店铺流程/SOP/筹备清单" },
+  { key: "priceSuggestion", label: "定价建议" },
+  { key: "groupPurchasePackageDesign", label: "团购套餐设计" },
+  { key: "marketingAdvice", label: "营销建议" },
+]
+
+interface ModulePermissions {
+  storeOpeningConsultation: boolean
+  categorySelectionAdvice: boolean
+  locationScreening: boolean
+  brandPositioningAdvice: boolean
+  licenseAndLaunchChecklist: boolean
+  storeOpeningProcessSOP: boolean
+  priceSuggestion: boolean
+  groupPurchasePackageDesign: boolean
+  marketingAdvice: boolean
+}
+
 interface Tenant {
   id: string
   name: string | null
@@ -16,6 +41,7 @@ interface Tenant {
     name: string | null
     role: string
   }>
+  modulePermissions?: ModulePermissions[]
 }
 
 export default function TenantsPage() {
@@ -32,6 +58,17 @@ export default function TenantsPage() {
     adminEmail: "",
     adminPassword: "",
     adminName: "",
+    modulePermissions: {
+      storeOpeningConsultation: true,
+      categorySelectionAdvice: true,
+      locationScreening: true,
+      brandPositioningAdvice: true,
+      licenseAndLaunchChecklist: true,
+      storeOpeningProcessSOP: true,
+      priceSuggestion: true,
+      groupPurchasePackageDesign: true,
+      marketingAdvice: true,
+    },
   })
 
   // 检查权限
@@ -72,7 +109,10 @@ export default function TenantsPage() {
         const res = await fetch(`/api/admin/tenants/${editingTenant.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: formData.name }),
+          body: JSON.stringify({ 
+            name: formData.name,
+            modulePermissions: formData.modulePermissions,
+          }),
         })
         if (!res.ok) throw new Error("更新失败")
       } else {
@@ -116,13 +156,27 @@ export default function TenantsPage() {
   }
 
   const handleOpenModal = (tenant?: Tenant) => {
+    const defaultPermissions = {
+      storeOpeningConsultation: true,
+      categorySelectionAdvice: true,
+      locationScreening: true,
+      brandPositioningAdvice: true,
+      licenseAndLaunchChecklist: true,
+      storeOpeningProcessSOP: true,
+      priceSuggestion: true,
+      groupPurchasePackageDesign: true,
+      marketingAdvice: true,
+    }
+
     if (tenant) {
+      const existingPermissions = tenant.modulePermissions?.[0] || defaultPermissions
       setEditingTenant(tenant)
       setFormData({
         name: tenant.name || "",
         adminEmail: "",
         adminPassword: "",
         adminName: "",
+        modulePermissions: existingPermissions,
       })
     } else {
       setEditingTenant(null)
@@ -131,6 +185,7 @@ export default function TenantsPage() {
         adminEmail: "",
         adminPassword: "",
         adminName: "",
+        modulePermissions: defaultPermissions,
       })
     }
     setError("")
@@ -229,7 +284,7 @@ export default function TenantsPage() {
                   {tenant.users.length === 0 ? (
                     <p className="text-sm text-gray-400 pl-6">暂无管理员</p>
                   ) : (
-                    <div className="pl-6 space-y-1">
+                    <div className="pl-6 space-y-1 mb-4">
                       {tenant.users.map((user) => (
                         <div key={user.id} className="flex items-center justify-between">
                           <div>
@@ -243,6 +298,24 @@ export default function TenantsPage() {
                       ))}
                     </div>
                   )}
+
+                  {/* 模块权限概览 */}
+                  <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                    <span>已启用模块：</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 pl-6">
+                    {MODULE_LIST.map((module) => {
+                      const isEnabled = tenant.modulePermissions?.[0]?.[module.key as keyof ModulePermissions] ?? true
+                      return isEnabled ? (
+                        <span
+                          key={module.key}
+                          className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full"
+                        >
+                          {module.label}
+                        </span>
+                      ) : null
+                    })}
+                  </div>
                 </div>
               </div>
             ))}
@@ -332,6 +405,35 @@ export default function TenantsPage() {
                   </div>
                 </>
               )}
+
+              {/* 模块权限配置 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-3">
+                  功能模块权限
+                </label>
+                <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
+                  {MODULE_LIST.map((module) => (
+                    <label
+                      key={module.key}
+                      className="flex items-center justify-between p-2 bg-white rounded border border-gray-200 hover:border-primary/50 cursor-pointer"
+                    >
+                      <span className="text-sm text-gray-700">{module.label}</span>
+                      <input
+                        type="checkbox"
+                        checked={formData.modulePermissions[module.key as keyof typeof formData.modulePermissions]}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          modulePermissions: {
+                            ...formData.modulePermissions,
+                            [module.key]: e.target.checked,
+                          },
+                        })}
+                        className="h-4 w-4 text-primary rounded border-gray-300 focus:ring-primary"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
 
               <div className="flex gap-3 pt-4">
                 <button

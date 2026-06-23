@@ -1,0 +1,6 @@
+/* Markdown 分割线间距 */
+.markdown-content hr {
+  margin-top: 8px !important;
+  margin-bottom: 8px !important;
+  border-top: 1px solid #e5e7eb;
+}

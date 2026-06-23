@@ -119,7 +119,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border text-center">
+          <div className="mt-6 pt-6 border-t border-border text-center" style={{display: "none"}}>
             <p className="text-sm text-muted-foreground">
               还没有账号？{" "}
               <Link href="/register" className="text-primary font-medium hover:underline">

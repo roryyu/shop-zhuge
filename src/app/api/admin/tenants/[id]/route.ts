@@ -50,12 +50,13 @@ export async function PUT(request: Request, { params }: { params: Params }) {
     }
 
     const { id } = await params
-    const { name } = await request.json()
+    const { name, modulePermissions } = await request.json()
 
     if (!name) {
       return NextResponse.json({ error: "租户名称为必填项" }, { status: 400 })
     }
 
+    // 1. 更新租户名称
     const tenant = await prisma.tenant.update({
       where: { id },
       data: { name },
@@ -70,6 +71,36 @@ export async function PUT(request: Request, { params }: { params: Params }) {
         },
       },
     })
+
+    // 2. 更新模块权限（upsert：存在则更新，不存在则创建）
+    if (modulePermissions) {
+      await prisma.tenantModulePermission.upsert({
+        where: { tenantId: id },
+        update: {
+          storeOpeningConsultation: modulePermissions.storeOpeningConsultation,
+          categorySelectionAdvice: modulePermissions.categorySelectionAdvice,
+          locationScreening: modulePermissions.locationScreening,
+          brandPositioningAdvice: modulePermissions.brandPositioningAdvice,
+          licenseAndLaunchChecklist: modulePermissions.licenseAndLaunchChecklist,
+          storeOpeningProcessSOP: modulePermissions.storeOpeningProcessSOP,
+          priceSuggestion: modulePermissions.priceSuggestion,
+          groupPurchasePackageDesign: modulePermissions.groupPurchasePackageDesign,
+          marketingAdvice: modulePermissions.marketingAdvice,
+        },
+        create: {
+          tenantId: id,
+          storeOpeningConsultation: modulePermissions.storeOpeningConsultation ?? true,
+          categorySelectionAdvice: modulePermissions.categorySelectionAdvice ?? true,
+          locationScreening: modulePermissions.locationScreening ?? true,
+          brandPositioningAdvice: modulePermissions.brandPositioningAdvice ?? true,
+          licenseAndLaunchChecklist: modulePermissions.licenseAndLaunchChecklist ?? true,
+          storeOpeningProcessSOP: modulePermissions.storeOpeningProcessSOP ?? true,
+          priceSuggestion: modulePermissions.priceSuggestion ?? true,
+          groupPurchasePackageDesign: modulePermissions.groupPurchasePackageDesign ?? true,
+          marketingAdvice: modulePermissions.marketingAdvice ?? true,
+        },
+      })
+    }
 
     return NextResponse.json(tenant)
   } catch (error) {

@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Sparkles, BarChart3, Users, Zap, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -38,12 +39,14 @@ export default function Home() {
             店诸葛用 AI 赋能实体门店，提供智能分析、客户管理、营销自动化等一站式解决方案
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="text-base">
-              免费开始使用
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+            <Link href="/plan">
+              <Button size="lg" className="text-base">
+                开店决策与商业计划
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
             <Button variant="outline" size="lg" className="text-base">
-              预约演示
+              联系客服
             </Button>
           </div>
         </div>

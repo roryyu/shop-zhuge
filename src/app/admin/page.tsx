@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import Link from "next/link"
-import { Building2, Users } from "lucide-react"
+import { Building2, Users, MessageSquare } from "lucide-react"
 
 export default function AdminDashboardPage() {
   const { data: session } = useSession()
@@ -14,6 +14,13 @@ export default function AdminDashboardPage() {
       href: "/admin/tenants",
       icon: Building2,
       color: "blue",
+    },
+    {
+      title: "提示词管理",
+      description: "管理各业务模块的 AI 提示词配置",
+      href: "/admin/prompt-settings",
+      icon: MessageSquare,
+      color: "purple",
     },
   ]
 

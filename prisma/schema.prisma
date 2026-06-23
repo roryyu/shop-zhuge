@@ -8,11 +8,32 @@ datasource db {
 }
 
 model Tenant {
-  id        String   @id @default(cuid())
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  users     User[]
+  id                    String                    @id @default(cuid())
+  name                  String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  users                 User[]
+  modulePermissions     TenantModulePermission[]
+}
+
+model TenantModulePermission {
+  id                          String   @id @default(cuid())
+  tenantId                    String
+  storeOpeningConsultation    Boolean  @default(true)
+  categorySelectionAdvice     Boolean  @default(true)
+  locationScreening           Boolean  @default(true)
+  brandPositioningAdvice      Boolean  @default(true)
+  licenseAndLaunchChecklist   Boolean  @default(true)
+  storeOpeningProcessSOP      Boolean  @default(true)
+  priceSuggestion             Boolean  @default(true)
+  groupPurchasePackageDesign  Boolean  @default(true)
+  marketingAdvice             Boolean  @default(true)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  tenant                      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId])
 }
 
 model User {
@@ -53,8 +74,9 @@ model Document {
 
 model OpeningDecisionSetting {
   id        String   @id @default(cuid())
-  module    String?
+  module    String   @unique
   prompt    String?
+  info      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
