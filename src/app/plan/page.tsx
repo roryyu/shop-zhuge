@@ -544,7 +544,7 @@ export default function PlanPage() {
                   disabled={!selectedModule || submitting}
                   className="min-h-[80px] resize-none pr-12"
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                       e.preventDefault()
                       handleSend()
                     }
