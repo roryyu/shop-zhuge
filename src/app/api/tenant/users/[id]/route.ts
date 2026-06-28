@@ -3,10 +3,12 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import bcrypt from "bcryptjs"
 
+type Params = Promise<{ id: string }>
+
 // 获取单个用户
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Params }
 ) {
   try {
     const session = await auth()
@@ -14,6 +16,8 @@ export async function GET(
     if (!session || (session.user as any).role !== "TENANTADMIN") {
       return NextResponse.json({ error: "无权访问" }, { status: 403 })
     }
+
+    const { id } = await params
 
     // 获取当前用户的tenantId
     const currentUser = await prisma.user.findUnique({
@@ -27,7 +31,7 @@ export async function GET(
 
     const user = await prisma.user.findUnique({
       where: { 
-        id: params.id,
+        id,
         tenantId: currentUser.tenantId,
       },
       select: {
@@ -55,7 +59,7 @@ export async function GET(
 // 更新用户
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Params }
 ) {
   try {
     const session = await auth()
@@ -63,6 +67,8 @@ export async function PUT(
     if (!session || (session.user as any).role !== "TENANTADMIN") {
       return NextResponse.json({ error: "无权访问" }, { status: 403 })
     }
+
+    const { id } = await params
 
     // 获取当前用户的tenantId
     const currentUser = await prisma.user.findUnique({
@@ -77,7 +83,7 @@ export async function PUT(
     // 验证要更新的用户属于当前租户
     const targetUser = await prisma.user.findUnique({
       where: { 
-        id: params.id,
+        id,
         tenantId: currentUser.tenantId,
       },
     })
@@ -129,7 +135,7 @@ export async function PUT(
     }
 
     const user = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       select: {
         id: true,
@@ -152,7 +158,7 @@ export async function PUT(
 // 删除用户
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Params }
 ) {
   try {
     const session = await auth()
@@ -160,6 +166,8 @@ export async function DELETE(
     if (!session || (session.user as any).role !== "TENANTADMIN") {
       return NextResponse.json({ error: "无权访问" }, { status: 403 })
     }
+
+    const { id } = await params
 
     // 获取当前用户的tenantId
     const currentUser = await prisma.user.findUnique({
@@ -174,7 +182,7 @@ export async function DELETE(
     // 验证要删除的用户属于当前租户
     const targetUser = await prisma.user.findUnique({
       where: { 
-        id: params.id,
+        id,
         tenantId: currentUser.tenantId,
       },
     })
@@ -184,12 +192,12 @@ export async function DELETE(
     }
 
     // 不允许删除自己
-    if (params.id === session.user.id) {
+    if (id === session.user.id) {
       return NextResponse.json({ error: "不能删除自己" }, { status: 400 })
     }
 
     await prisma.user.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })
