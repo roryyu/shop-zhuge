@@ -85,7 +85,7 @@ export function Navbar() {
                     <button
                       onClick={() => {
                         setShowUserMenu(false)
-                        signOut()
+                        signOut({ redirectTo: "/" })
                       }}
                       className="block w-full text-left px-4 py-2 text-sm text-[#222222] hover:bg-[#f7f7f7]"
                     >
